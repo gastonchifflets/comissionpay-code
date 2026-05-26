@@ -727,6 +727,7 @@
     };
 
     // ── Derived metrics ──
+    // Use 0.5 as a minimum for processing_days to avoid division by zero in commission_accrual
     const eff_days = Math.max(processing_days, 0.5);
     const derived = {
       commission_accrual: tx_cost / eff_days,
@@ -750,7 +751,8 @@
       const value  = isBase ? m.base[key] : m.derived[key];
       const values = allM.map(x => isBase ? x.base[key] : x.derived[key]);
       const min = Math.min(...values), max = Math.max(...values);
-      const normalized = max === min ? 1 : 1 - (value - min) / (max - min); // lower = better
+      // When all platforms share the same value, scores are neutral (0.5) — no platform is penalized
+      const normalized = max === min ? 0.5 : 1 - (value - min) / (max - min); // lower value = higher score
       weightedSum += normalized * w;
       totalW += w;
     });
@@ -1067,7 +1069,7 @@
       ? allPlatforms().find(x => x.id === step.platformId) : null;
 
     const platformInfo = p
-      ? `<div class="platform-chip">${p.commission_pct}% commission · ${fmtMoney(p.fixed_fee,'USD')} fixed · ${p.processing_days}d processing${p.withdrawal_fee?` · ${p.withdrawal_fee}% withdrawal`:''}</div>`
+      ? `<div class="platform-chip">${p.commission_pct}% commission · ${fmtMoney(p.fixed_fee, S.flowCurrency)} fixed · ${p.processing_days}d processing${p.withdrawal_fee?` · ${p.withdrawal_fee}% withdrawal`:''}</div>`
       : '';
 
     // Calculate live result
@@ -1246,7 +1248,8 @@
     document.getElementById('cp-save').addEventListener('click', () => {
       const name = document.getElementById('cp-name').value.trim();
       if (!name) { alert('Please enter a platform name.'); return; }
-      const id = `custom_${Date.now()}`;
+      // Use counter-based ID to guarantee uniqueness even when added rapidly
+      const id = `custom_${++S.stepSeq}`;
       S.customPlatforms.push({
         id, name, emoji:'🏦',
         commission_pct:  parseFloat(document.getElementById('cp-comm').value)    || 0,
